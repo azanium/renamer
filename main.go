@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Surah names with English & Arabic titles
@@ -138,26 +139,54 @@ func extractSurahNumber(filename string) (int, error) {
 	return strconv.Atoi(match)
 }
 
-// Renames files based on extracted Surah number
 func RenameFiles(pattern string) {
-	files, _ := filepath.Glob(pattern)
-	for _, file := range files {
-		index, err := extractSurahNumber(filepath.Base(file))
+	// Get the directory from the pattern
+	baseDir := filepath.Dir(pattern)
+	if baseDir == "." {
+		var err error
+		baseDir, err = os.Getwd()
 		if err != nil {
-			log.Printf("Skipping %s (no valid number found)\n", file)
-			continue
-		}
-
-		if surah, found := surahNames[index]; found {
-			newName := fmt.Sprintf("%03d - %s - %s%s", index, surah.English, surah.Arabic, filepath.Ext(file))
-			err := os.Rename(file, newName)
-			if err != nil {
-				log.Printf("Error renaming %s: %v\n", file, err)
-			} else {
-				fmt.Printf("Renamed: %s → %s\n", file, newName)
-			}
+			log.Printf("Error getting working directory: %v", err)
+			return
 		}
 	}
+
+	fileCount := 0
+	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// Check if file ends with .mp3
+		if !strings.HasSuffix(strings.ToLower(info.Name()), ".mp3") {
+			return nil
+		}
+
+		fileCount++
+		index, err := extractSurahNumber(filepath.Base(path))
+		if err == nil {
+			if surah, found := surahNames[index]; found {
+				dir := filepath.Dir(path)
+				newName := fmt.Sprintf("%03d - %s (%s)%s", index, surah.English, surah.Arabic, filepath.Ext(path))
+				newPath := filepath.Join(dir, newName)
+				err = os.Rename(path, newPath)
+				if err != nil {
+					log.Printf("Error renaming file %s: %v", path, err)
+					return nil
+				}
+				fmt.Printf("Renamed: %s → %s\n", path, newPath)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("Error walking directory: %v", err)
+	}
+	fmt.Printf("\nTotal files processed: %d\n", fileCount)
 }
 
 func main() {
