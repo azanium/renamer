@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 )
 
@@ -35,7 +36,7 @@ var surahNames = map[int]struct {
 	20:  {"Taha", "طه"},
 	21:  {"Al-Anbiya", "الأنبياء"},
 	22:  {"Al-Hajj", "الحج"},
-	23:  {"Al-Muminoon", "المؤمنون"},
+	23:  {"Al-Mu'minoon", "المؤمنون"},
 	24:  {"An-Noor", "النور"},
 	25:  {"Al-Furqan", "الفرقان"},
 	26:  {"Ash-Shuara", "الشعراء"},
@@ -49,11 +50,11 @@ var surahNames = map[int]struct {
 	34:  {"Saba", "سبأ"},
 	35:  {"Fathir", "فاطر"},
 	36:  {"Yaseen", "يس"},
-	37:  {"As-Saffath", "الصافات"},
+	37:  {"As-Saffat", "الصافات"},
 	38:  {"Saad", "ص"},
 	39:  {"Az-Zumar", "الزمر"},
 	40:  {"Gafir", "غافر"},
-	41:  {"Fussilath", "فصلت"},
+	41:  {"Fussilat", "فصلت"},
 	42:  {"Ash-Shoora", "الشورى"},
 	43:  {"Az-Zukruf", "الزخرف"},
 	44:  {"Ad-Dukhan", "الدخان"},
@@ -61,10 +62,10 @@ var surahNames = map[int]struct {
 	46:  {"Al-Ahqaf", "الأحقاف"},
 	47:  {"Muhammad", "محمد"},
 	48:  {"Al-Fath", "الفتح"},
-	49:  {"Al-Hujurath", "الحجرات"},
+	49:  {"Al-Hujurat", "الحجرات"},
 	50:  {"Qaf", "ق"},
-	51:  {"Adh-Dhariyath", "الذاريات"},
-	52:  {"Ath-Thoor", "الطور"},
+	51:  {"Adh-Dhariyat", "الذاريات"},
+	52:  {"At-Toor", "الطور"},
 	53:  {"An-Najm", "النجم"},
 	54:  {"Al-Qamar", "القمر"},
 	55:  {"Ar-Rahman", "الرحمن"},
@@ -76,9 +77,9 @@ var surahNames = map[int]struct {
 	61:  {"Al-Saff", "الصف"},
 	62:  {"Al-Jumuah", "الجمعة"},
 	63:  {"Al-Munafiqun", "المنافقون"},
-	64:  {"Ath-Thagabun", "التغابن"},
-	65:  {"Ath-Talaq", "الطلاق"},
-	66:  {"Ath-Thahreem", "التحريم"},
+	64:  {"At-Thagabun", "التغابن"},
+	65:  {"At-Talaq", "الطلاق"},
+	66:  {"At-Tahreem", "التحريم"},
 	67:  {"Al-Mulk", "الملك"},
 	68:  {"Al-Qalam", "القلم"},
 	69:  {"Al-Haqqah", "الحاقة"},
@@ -89,7 +90,7 @@ var surahNames = map[int]struct {
 	74:  {"Al-Muddassir", "المدثر"},
 	75:  {"Al-Qiamah", "القيامة"},
 	76:  {"Al-Insan", "الإنسان"},
-	77:  {"Al-Mursalath", "المرسلات"},
+	77:  {"Al-Mursalat", "المرسلات"},
 	78:  {"An-Naba", "النبأ"},
 	79:  {"An-Naziath", "النازعات"},
 	80:  {"Abasa", "عبس"},
@@ -114,7 +115,7 @@ var surahNames = map[int]struct {
 	99:  {"Al-Zalzalah", "الزلزلة"},
 	100: {"Al-Aadiyat", "العاديات"},
 	101: {"Al-Qariah", "القارعة"},
-	102: {"Ath-Thakathur", "التكاثر"},
+	102: {"At-Thakathur", "التكاثر"},
 	103: {"Al-Asr", "العصر"},
 	104: {"Al-Humazah", "الهمزة"},
 	105: {"Al-Fil", "الفيل"},
@@ -130,14 +131,31 @@ var surahNames = map[int]struct {
 }
 
 // Rename function using CLI parameters
+
+func extractSurahNumber(filename string) (int, error) {
+	re := regexp.MustCompile(`\d+`) // Find first number in filename
+	match := re.FindString(filename)
+	return strconv.Atoi(match)
+}
+
+// Renames files based on extracted Surah number
 func RenameFiles(pattern string) {
 	files, _ := filepath.Glob(pattern)
 	for _, file := range files {
-		index, _ := strconv.Atoi(filepath.Base(file[:len(file)-len(filepath.Ext(file))]))
+		index, err := extractSurahNumber(filepath.Base(file))
+		if err != nil {
+			log.Printf("Skipping %s (no valid number found)\n", file)
+			continue
+		}
+
 		if surah, found := surahNames[index]; found {
-			newName := fmt.Sprintf("%03d - %s (%s%s)", index, surah.English, surah.Arabic, filepath.Ext(file))
-			os.Rename(file, newName)
-			fmt.Printf("Renamed: %s → %s\n", file, newName)
+			newName := fmt.Sprintf("%03d - %s - %s%s", index, surah.English, surah.Arabic, filepath.Ext(file))
+			err := os.Rename(file, newName)
+			if err != nil {
+				log.Printf("Error renaming %s: %v\n", file, err)
+			} else {
+				fmt.Printf("Renamed: %s → %s\n", file, newName)
+			}
 		}
 	}
 }
